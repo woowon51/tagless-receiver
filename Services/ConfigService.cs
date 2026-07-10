@@ -1,0 +1,55 @@
+// config.json 존재 확인
+// 없으면 생성
+// 있으면 읽기
+
+using System.Text.Json;
+using tagless_receiver.Models;
+
+namespace tagless_receiver.Services;
+
+public static class ConfigService
+{
+    private static readonly string configPath =
+        Path.Combine(AppContext.BaseDirectory, "config.json");
+
+    public static ReceiverConfig LoadOrCreate()
+    {
+        // config.json 이 있으면 읽기
+        if (File.Exists(configPath))
+        {
+            string json = File.ReadAllText(configPath);
+
+            ReceiverConfig? config =
+                JsonSerializer.Deserialize<ReceiverConfig>(json);
+
+            if (config != null)
+                return config;
+        }
+
+        // 없으면 새로 생성
+        ReceiverConfig newConfig = new ReceiverConfig
+        {
+            receiver_device_id = Guid.NewGuid().ToString(),
+            business_id = null,
+            class_id = null,
+            staff_id = null,
+            registered = false
+        };
+
+        Save(newConfig);
+
+        return newConfig;
+    }
+
+    public static void Save(ReceiverConfig config)
+    {
+        string json = JsonSerializer.Serialize(
+            config,
+            new JsonSerializerOptions
+            {
+                WriteIndented = true
+            });
+
+        File.WriteAllText(configPath, json);
+    }
+}
