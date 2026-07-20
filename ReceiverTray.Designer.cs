@@ -1,6 +1,6 @@
 ﻿namespace tagless_receiver;
 
-partial class Form1
+partial class ReceiverTray
 {
     /// <summary>
     ///  Required designer variable.

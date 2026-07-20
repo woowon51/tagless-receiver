@@ -3,11 +3,11 @@ using tagless_receiver.Services;
 
 namespace tagless_receiver;
 
-public partial class Form1 : Form
+public partial class ReceiverTray : Form
 {
     private readonly ReceiverConfig config;
 
-    public Form1()
+    public ReceiverTray()
     {
         InitializeComponent();
 

@@ -9,8 +9,11 @@ namespace tagless_receiver.Services;
 
 public static class ConfigService
 {
+    private static readonly string configFolder =
+    @"C:\TaglessReceiver";
+
     private static readonly string configPath =
-        Path.Combine(AppContext.BaseDirectory, "config.json");
+        Path.Combine(configFolder, "config.json");
 
     public static ReceiverConfig LoadOrCreate()
     {
@@ -26,23 +29,29 @@ public static class ConfigService
                 return config;
         }
 
-        // 없으면 새로 생성
+        // config.json 이 없으면 새로 생성
         ReceiverConfig newConfig = new ReceiverConfig
         {
             receiver_device_id = Guid.NewGuid().ToString(),
             business_id = null,
             class_id = null,
             staff_id = null,
-            registered = false
+            registered = false,
+            config_version = 1
         };
 
+        // config.json 저장
         Save(newConfig);
 
+        // 새로 생성한 config.json 반환
         return newConfig;
     }
 
     public static void Save(ReceiverConfig config)
     {
+        // C:\TaglessReceiver  폴더가 없으면 생성
+        Directory.CreateDirectory(configFolder);
+
         string json = JsonSerializer.Serialize(
             config,
             new JsonSerializerOptions
