@@ -7,6 +7,8 @@ public partial class ReceiverTray : Form
 {
     private ReceiverConfig config;
 
+    private readonly BleScanService bleScanService = new();
+
     public ReceiverTray()
     {
         InitializeComponent();
@@ -38,6 +40,7 @@ public partial class ReceiverTray : Form
             );
 
             // TODO: BLE Scan 시작
+            bleScanService.Start();
             return;
         }
 
@@ -84,5 +87,6 @@ public partial class ReceiverTray : Form
         );
 
         // TODO: BLE Scan 시작
+        bleScanService.Start();
     }
 }

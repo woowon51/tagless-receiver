@@ -10,7 +10,7 @@ public static class RegistrationService
     // TODO:
     // 실제 Railway 서버 주소와 Receiver 조회 API 경로로 교체
     private const string RegistrationApiUrl =
-        "http://172.30.1.22:8000/receiver/config";
+        "http://127.0.0.1:5000/receiver/config";
 
     public static async Task<ReceiverConfig?> GetRegistrationAsync(
         string receiverDeviceId)
