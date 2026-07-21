@@ -10,8 +10,6 @@ public class ReceiverConfig
 
     public int? class_id { get; set; }
 
-    public int? staff_id { get; set; }
-
     public bool registered { get; set; } = false;
 
     public int config_version { get; set; } = 1;

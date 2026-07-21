@@ -35,7 +35,6 @@ public static class ConfigService
             receiver_device_id = Guid.NewGuid().ToString(),
             business_id = null,
             class_id = null,
-            staff_id = null,
             registered = false,
             config_version = 1
         };
@@ -60,5 +59,6 @@ public static class ConfigService
             });
 
         File.WriteAllText(configPath, json);
+
     }
 }

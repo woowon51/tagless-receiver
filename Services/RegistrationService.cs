@@ -1,0 +1,51 @@
+﻿using System.Net.Http.Json;
+using tagless_receiver.Models;
+
+namespace tagless_receiver.Services;
+
+public static class RegistrationService
+{
+    private static readonly HttpClient httpClient = new();
+
+    // TODO:
+    // 실제 Railway 서버 주소와 Receiver 조회 API 경로로 교체
+    private const string RegistrationApiUrl =
+        "http://172.30.1.22:8000/receiver/config";
+
+    public static async Task<ReceiverConfig?> GetRegistrationAsync(
+        string receiverDeviceId)
+    {
+        try
+        {
+            string url =
+                $"{RegistrationApiUrl}?receiver_device_id={Uri.EscapeDataString(receiverDeviceId)}";
+
+            HttpResponseMessage response =
+                await httpClient.GetAsync(url);
+
+            // 아직 서버에 등록되지 않은 수신장치
+            if (response.StatusCode ==
+                System.Net.HttpStatusCode.NotFound)
+            {
+                return null;
+            }
+
+            response.EnsureSuccessStatusCode();
+
+            ReceiverConfig? serverConfig =
+                await response.Content
+                    .ReadFromJsonAsync<ReceiverConfig>();
+
+            return serverConfig;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine(
+                $"[RegistrationService ERROR] {ex}"
+            );
+            // 서버 연결 실패 시 Receiver 프로그램은 종료하지 않음
+            // 이후 재시도 구조를 붙일 예정
+            return null;
+        }
+    }
+}
