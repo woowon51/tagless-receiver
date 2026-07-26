@@ -10,7 +10,7 @@ public static class RegistrationService
     // TODO:
     // 실제 Railway 서버 주소와 Receiver 조회 API 경로로 교체
     private const string RegistrationApiUrl =
-        "http://127.0.0.1:5000/receiver/config";
+        "https://tagless-api-production.up.railway.app/receiver/config";
 
     public static async Task<ReceiverConfig?> GetRegistrationAsync(
         string receiverDeviceId)
@@ -20,8 +20,12 @@ public static class RegistrationService
             string url =
                 $"{RegistrationApiUrl}?receiver_device_id={Uri.EscapeDataString(receiverDeviceId)}";
 
+            Logger.Write($"GET {url}");
+
             HttpResponseMessage response =
                 await httpClient.GetAsync(url);
+
+            Logger.Write($"Status = {(int)response.StatusCode}");
 
             // 아직 서버에 등록되지 않은 수신장치
             if (response.StatusCode ==
@@ -31,6 +35,11 @@ public static class RegistrationService
             }
 
             response.EnsureSuccessStatusCode();
+
+            string json =
+                await response.Content.ReadAsStringAsync();
+
+                Logger.Write(json);
 
             ReceiverConfig? serverConfig =
                 await response.Content
