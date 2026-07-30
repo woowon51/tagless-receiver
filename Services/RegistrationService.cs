@@ -1,4 +1,6 @@
-﻿using System.Net.Http.Json;
+﻿using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
 using tagless_receiver.Models;
 
 namespace tagless_receiver.Services;
@@ -7,10 +9,110 @@ public static class RegistrationService
 {
     private static readonly HttpClient httpClient = new();
 
-    // TODO:
-    // 실제 Railway 서버 주소와 Receiver 조회 API 경로로 교체
+    private const string ApiBaseUrl =
+        "https://tagless-api-production.up.railway.app/receiver";
+
     private const string RegistrationApiUrl =
-        "https://tagless-api-production.up.railway.app/receiver/config";
+        ApiBaseUrl + "/config";
+
+    private const string RegisterCheckApiUrl =
+        ApiBaseUrl + "/register-check";
+
+    private const string CleanupApiUrl =
+        ApiBaseUrl + "/cleanup";
+
+    private static readonly JsonSerializerOptions jsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
+    public static async Task<ReceiverConfig?> RegisterCheckAsync(
+        string receiverDeviceId,
+        string hardwareFingerprint)
+    {
+        try
+        {
+            var payload = new
+            {
+                receiver_device_id = receiverDeviceId,
+                hardware_fingerprint = hardwareFingerprint
+            };
+
+            Logger.Write(
+                $"POST {RegisterCheckApiUrl} " +
+                $"receiver_device_id={receiverDeviceId}"
+            );
+
+            using HttpResponseMessage response =
+                await httpClient.PostAsJsonAsync(
+                    RegisterCheckApiUrl,
+                    payload
+                );
+
+            Logger.Write($"Status = {(int)response.StatusCode}");
+
+            string json =
+                await response.Content.ReadAsStringAsync();
+
+            Logger.Write(json);
+
+            response.EnsureSuccessStatusCode();
+
+            return JsonSerializer.Deserialize<ReceiverConfig>(
+                json,
+                jsonOptions
+            );
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(
+                "[RegistrationService] RegisterCheckAsync 실패",
+                ex
+            );
+
+            return null;
+        }
+    }
+
+    public static async Task<int?> CleanupPendingAsync()
+    {
+        try
+        {
+            Logger.Write($"POST {CleanupApiUrl}");
+
+            using HttpResponseMessage response =
+                await httpClient.PostAsync(
+                    CleanupApiUrl,
+                    content: null
+                );
+
+            Logger.Write($"Status = {(int)response.StatusCode}");
+
+            string json =
+                await response.Content.ReadAsStringAsync();
+
+            Logger.Write(json);
+
+            response.EnsureSuccessStatusCode();
+
+            CleanupResponse? result =
+                JsonSerializer.Deserialize<CleanupResponse>(
+                    json,
+                    jsonOptions
+                );
+
+            return result?.deleted_count;
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(
+                "[RegistrationService] CleanupPendingAsync 실패",
+                ex
+            );
+
+            return null;
+        }
+    }
 
     public static async Task<ReceiverConfig?> GetRegistrationAsync(
         string receiverDeviceId)
@@ -18,43 +120,48 @@ public static class RegistrationService
         try
         {
             string url =
-                $"{RegistrationApiUrl}?receiver_device_id={Uri.EscapeDataString(receiverDeviceId)}";
+                $"{RegistrationApiUrl}" +
+                $"?receiver_device_id=" +
+                $"{Uri.EscapeDataString(receiverDeviceId)}";
 
             Logger.Write($"GET {url}");
 
-            HttpResponseMessage response =
+            using HttpResponseMessage response =
                 await httpClient.GetAsync(url);
 
             Logger.Write($"Status = {(int)response.StatusCode}");
 
-            // 아직 서버에 등록되지 않은 수신장치
-            if (response.StatusCode ==
-                System.Net.HttpStatusCode.NotFound)
+            if (response.StatusCode == HttpStatusCode.NotFound)
             {
                 return null;
             }
 
-            response.EnsureSuccessStatusCode();
-
             string json =
                 await response.Content.ReadAsStringAsync();
 
-                Logger.Write(json);
+            Logger.Write(json);
 
-            ReceiverConfig? serverConfig =
-                await response.Content
-                    .ReadFromJsonAsync<ReceiverConfig>();
+            response.EnsureSuccessStatusCode();
 
-            return serverConfig;
+            return JsonSerializer.Deserialize<ReceiverConfig>(
+                json,
+                jsonOptions
+            );
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine(
-                $"[RegistrationService ERROR] {ex}"
+            Logger.Error(
+                "[RegistrationService] GetRegistrationAsync 실패",
+                ex
             );
-            // 서버 연결 실패 시 Receiver 프로그램은 종료하지 않음
-            // 이후 재시도 구조를 붙일 예정
+
             return null;
         }
+    }
+
+    private sealed class CleanupResponse
+    {
+        public string? status { get; set; }
+        public int deleted_count { get; set; }
     }
 }

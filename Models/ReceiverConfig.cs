@@ -6,6 +6,8 @@ public class ReceiverConfig
 
     public string app_version { get; set; } = "1.0.0";
 
+    public string hardware_fingerprint { get; set; } = "";
+
     public int? business_id { get; set; }
 
     public int? class_id { get; set; }

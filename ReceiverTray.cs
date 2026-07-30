@@ -49,8 +49,9 @@ public partial class ReceiverTray : Form
         }
 
         ReceiverConfig? serverConfig =
-            await RegistrationService.GetRegistrationAsync(
-                config.receiver_device_id
+            await RegistrationService.RegisterCheckAsync(
+                config.receiver_device_id,
+                config.hardware_fingerprint
             );
 
         if (serverConfig is null)
@@ -103,7 +104,7 @@ public partial class ReceiverTray : Form
 
         config.business_id = serverConfig.business_id;
         config.class_id = serverConfig.class_id;
-        config.registered = true;
+        config.registered = serverConfig.registered;
         config.config_version = serverConfig.config_version;
 
 

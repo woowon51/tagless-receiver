@@ -33,6 +33,7 @@ public static class ConfigService
         ReceiverConfig newConfig = new ReceiverConfig
         {
             receiver_device_id = Guid.NewGuid().ToString(),
+            hardware_fingerprint = HardwareFingerprintService.Create(),
             business_id = null,
             class_id = null,
             registered = false,
