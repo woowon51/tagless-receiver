@@ -37,76 +37,84 @@ public partial class ReceiverTray : Form
             $"[Receiver] 시작 registered={config.registered}"
         );
 
+        // 이미 등록된 장치
         if (config.registered)
         {
             Logger.Write(
                 "[Receiver] 이미 등록 완료"
             );
 
-            // TODO: BLE Scan 시작
             bleScanService.Start();
             return;
         }
 
-        ReceiverConfig? serverConfig =
-            await RegistrationService.RegisterCheckAsync(
-                config.receiver_device_id,
-                config.hardware_fingerprint
-            );
+        ReceiverConfig? serverConfig = null;
 
-        if (serverConfig is null)
+        bool pendingLogged = false;
+
+        while (true)
         {
-            Logger.Write(
-                "[Receiver] 미등록 장치 - 등록 페이지 열기"  
-            );
+            serverConfig =
+                await RegistrationService.RegisterCheckAsync(
+                    config.receiver_device_id,
+                    config.hardware_fingerprint
+                );
 
-            /*            // 등록페이지를 브라우저로 열어야 한다.
-            C# → /receiver/qr?receiver_device_id=UUID
-            QR 화면 → /receiver/start?...&receiver_device_id=UUID
-            screen1 → screen2 hidden
-            screen2 → install_welcome()
-            DB 저장
-            */
+            // 서버 통신 실패 또는 응답 해석 실패
+            if (serverConfig is null)
+            {
+                Logger.Write(
+                    "[Receiver] register-check 실패 - 2초 후 재조회"
+                );
 
-            string registrationUrl =
-                //        $"{ApiConfig.BaseUrl}/receiver/qr" +
-                "https://tagless-api-production.up.railway.app/receiver/qr" +
-                $"?receiver_device_id={Uri.EscapeDataString(config.receiver_device_id)}";
+                await Task.Delay(2000);
+                continue;
+            }
 
-            System.Diagnostics.Process.Start(
-                new System.Diagnostics.ProcessStartInfo
+            // 아직 정식 등록 전
+            if (!serverConfig.registered)
+            {
+                if (!pendingLogged)
                 {
-                    FileName = registrationUrl,
-                    UseShellExecute = true
-                }
-            );
+                    config.business_id = null;
+                    config.class_id = null;
+                    config.registered = false;
+                    config.config_version =
+                        serverConfig.config_version;
 
-            return;
+                    ConfigService.Save(config);
+
+                    Logger.Write(
+                        "[Receiver] 임시등록 완료 - 등록상태 재조회 시작: " +
+                        $"business_id={serverConfig.business_id}, " +
+                        $"class_id={serverConfig.class_id}, " +
+                        $"registered={serverConfig.registered}"
+                    );
+
+                    pendingLogged = true;
+                }
+
+                await Task.Delay(2000);
+                continue;
+            }
+
+            // registered=true가 되었으므로 반복 종료
+            break;
         }
 
+        // 정식 등록 완료
+        config.business_id = serverConfig.business_id;
+        config.class_id = serverConfig.class_id;
+        config.registered = true;
+        config.config_version =
+            serverConfig.config_version;
+
         Logger.Write(
-            $"[Receiver] 서버 응답: " +
+            $"[Receiver] 정식등록 확인: " +
             $"business_id={serverConfig.business_id}, " +
             $"class_id={serverConfig.class_id}, " +
             $"registered={serverConfig.registered}"
         );
-
-        /*
-        if (!serverConfig.registered)
-        {
-            System.Diagnostics.Debug.WriteLine(
-                "[Receiver] 서버상 미등록 상태"
-            );
-
-            return;
-        }
-        */
-
-        config.business_id = serverConfig.business_id;
-        config.class_id = serverConfig.class_id;
-        config.registered = serverConfig.registered;
-        config.config_version = serverConfig.config_version;
-
 
         ConfigService.Save(config);
 
@@ -114,7 +122,17 @@ public partial class ReceiverTray : Form
             @"[Receiver] C:\TaglessReceiver\config.json 저장 완료"
         );
 
-        // TODO: BLE Scan 시작
+        Logger.Write(
+            "[Receiver] BLE 스캔 시작"
+        );
+
+        MessageBox.Show(
+            "등록이 완료되어 BLE 스캔을 시작합니다.",
+            "Tagless Receiver",
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Information
+        );
+
         bleScanService.Start();
     }
 }

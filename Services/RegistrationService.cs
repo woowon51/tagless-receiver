@@ -38,23 +38,14 @@ public static class RegistrationService
                 hardware_fingerprint = hardwareFingerprint
             };
 
-            Logger.Write(
-                $"POST {RegisterCheckApiUrl} " +
-                $"receiver_device_id={receiverDeviceId}"
-            );
-
             using HttpResponseMessage response =
                 await httpClient.PostAsJsonAsync(
                     RegisterCheckApiUrl,
                     payload
                 );
 
-            Logger.Write($"Status = {(int)response.StatusCode}");
-
             string json =
                 await response.Content.ReadAsStringAsync();
-
-            Logger.Write(json);
 
             response.EnsureSuccessStatusCode();
 
@@ -78,20 +69,14 @@ public static class RegistrationService
     {
         try
         {
-            Logger.Write($"POST {CleanupApiUrl}");
-
             using HttpResponseMessage response =
                 await httpClient.PostAsync(
                     CleanupApiUrl,
                     content: null
                 );
 
-            Logger.Write($"Status = {(int)response.StatusCode}");
-
             string json =
                 await response.Content.ReadAsStringAsync();
-
-            Logger.Write(json);
 
             response.EnsureSuccessStatusCode();
 
@@ -129,8 +114,6 @@ public static class RegistrationService
             using HttpResponseMessage response =
                 await httpClient.GetAsync(url);
 
-            Logger.Write($"Status = {(int)response.StatusCode}");
-
             if (response.StatusCode == HttpStatusCode.NotFound)
             {
                 return null;
@@ -138,8 +121,6 @@ public static class RegistrationService
 
             string json =
                 await response.Content.ReadAsStringAsync();
-
-            Logger.Write(json);
 
             response.EnsureSuccessStatusCode();
 
