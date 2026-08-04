@@ -7,6 +7,13 @@ public sealed class BleScanService
 {
     private BluetoothLEAdvertisementWatcher? watcher;
 
+    private bool taglessSenderDetectedLogged = false;
+
+    private static readonly Guid TaglessSenderServiceUuid =
+        Guid.Parse(
+            "e747f937-5029-55a4-90ed-370194b05a34"
+        );
+
     public void Start()
     {
         if (watcher != null)
@@ -22,7 +29,7 @@ public sealed class BleScanService
 
         watcher.Start();
 
-        Debug.WriteLine("[BLE] Scan 시작");
+        Logger.Write("[BLE] Scan 시작");
     }
 
     public void Stop()
@@ -35,33 +42,51 @@ public sealed class BleScanService
         watcher.Stopped -= OnWatcherStopped;
         watcher = null;
 
-        Debug.WriteLine("[BLE] Scan 중지");
+        taglessSenderDetectedLogged = false;
+
+        Logger.Write("[BLE] Scan 중지");
     }
 
     private void OnAdvertisementReceived(
         BluetoothLEAdvertisementWatcher sender,
         BluetoothLEAdvertisementReceivedEventArgs args)
     {
+        bool isTaglessSender =
+            args.Advertisement.ServiceUuids.Contains(
+                TaglessSenderServiceUuid
+            );
+
+        if (!isTaglessSender)
+            return;
+
         string bluetoothAddress =
             args.BluetoothAddress.ToString("X12");
 
-        short rssi = args.RawSignalStrengthInDBm;
+        short rssi =
+            args.RawSignalStrengthInDBm;
 
         string localName =
             args.Advertisement.LocalName ?? "";
 
-        Debug.WriteLine(
-            $"[BLE] address={bluetoothAddress}, " +
-            $"rssi={rssi}, " +
-            $"name={localName}"
-        );
+        if (!taglessSenderDetectedLogged)
+        {
+            taglessSenderDetectedLogged = true;
+
+            Logger.Write(
+                $"[BLE] Tagless Sender 감지: " +
+                $"service_uuid={TaglessSenderServiceUuid}, " +
+                $"address={bluetoothAddress}, " +
+                $"RSSI={rssi}, " +
+                $"name={localName}"
+            );
+        }
     }
 
     private void OnWatcherStopped(
         BluetoothLEAdvertisementWatcher sender,
         BluetoothLEAdvertisementWatcherStoppedEventArgs args)
     {
-        Debug.WriteLine(
+        Logger.Write(
             $"[BLE] Watcher 중지 error={args.Error}"
         );
     }
