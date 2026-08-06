@@ -51,6 +51,19 @@ public sealed class BleScanService
         BluetoothLEAdvertisementWatcher sender,
         BluetoothLEAdvertisementReceivedEventArgs args)
     {
+        Logger.Write(
+            $"[BLE] Advertisement 수신  UUID={args.Advertisement.ServiceUuids.Count}"
+        );
+
+        Logger.Write(
+            $"[BLE] UUID Count = {args.Advertisement.ServiceUuids.Count}"
+        );
+
+        foreach (var uuid in args.Advertisement.ServiceUuids)
+        {
+            Logger.Write($"UUID={uuid}");
+        }
+
         bool isTaglessSender =
             args.Advertisement.ServiceUuids.Contains(
                 TaglessSenderServiceUuid
