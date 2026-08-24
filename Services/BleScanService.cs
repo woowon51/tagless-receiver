@@ -9,6 +9,9 @@ public sealed class BleScanService
 
     private readonly HashSet<int> detectedSenderIds = new();
 
+    private long bleDebugCount = 0;
+    private long taglessCount = 0;
+
     private static readonly Guid TaglessSenderServiceUuid =
         Guid.Parse(
             "e747f937-5029-55a4-90ed-370194b05a34"
@@ -51,20 +54,18 @@ public sealed class BleScanService
         BluetoothLEAdvertisementWatcher sender,
         BluetoothLEAdvertisementReceivedEventArgs args)
     {
-        Logger.Write(
-            $"[BLE-DEBUG] 광고 수신 " +
-            $"address={args.BluetoothAddress:X12}, " +
-            $"RSSI={args.RawSignalStrengthInDBm}, " +
-            $"sections={args.Advertisement.DataSections.Count}"
-        );
+        bleDebugCount++;
+
+        if (bleDebugCount == 1 || bleDebugCount % 500 == 0)
+        {
+            Logger.Write(
+                $"[BLE-DEBUG] 일반 BLE 광고 수신 {bleDebugCount}회"
+            );
+        }
 
         foreach (var section in args.Advertisement.DataSections)
         {
-            Logger.Write(
-                $"[BLE-DEBUG] section " +
-                $"type=0x{section.DataType:X2}, " +
-                $"length={section.Data.Length}"
-            );
+
             // 128-bit Service Data
             if (section.DataType != 0x21)
                 continue;
@@ -78,12 +79,6 @@ public sealed class BleScanService
             // UUID 16바이트 + sender_device_id 4바이트
             if (bytes.Length != 20)
                 continue;
-
-            Logger.Write(
-                $"[BLE-DEBUG] ServiceData=" +
-                BitConverter.ToString(bytes)
-            );
-
 
             // BLE Service Data에 들어오는 Tagless UUID의 실제 바이트 순서
             byte[] taglessUuidBytes =
@@ -118,29 +113,12 @@ public sealed class BleScanService
             string bluetoothAddress =
                 args.BluetoothAddress.ToString("X12");
 
-            // 같은 Sender는 최초 1회만 로그
-            if (detectedSenderIds.Add(senderDeviceId))
+            taglessCount++;
+
+            if (taglessCount == 1 || taglessCount % 500 == 0)
             {
                 Logger.Write(
-                    $"[BLE] Tagless Sender 확인: " +
-                    $"sender_device_id={senderDeviceId}, " +
-                    $"address={bluetoothAddress}, " +
-                    $"RSSI={rssi}"
-                );
-            }
-
-            bool isFirst = detectedSenderIds.Add(senderDeviceId);
-
-            Logger.Write(
-                $"[BLE-DEBUG] Tagless UUID 일치: " +
-                $"sender_device_id={senderDeviceId}, " +
-                $"first={isFirst}"
-            );
-
-            if (isFirst)
-            {
-                Logger.Write(
-                    $"[BLE] Tagless Sender 확인: " +
+                    $"[BLE] Tagless Sender 확인 {taglessCount}회: " +
                     $"sender_device_id={senderDeviceId}, " +
                     $"address={bluetoothAddress}, " +
                     $"RSSI={rssi}"
