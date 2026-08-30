@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using Windows.Devices.Bluetooth.Advertisement;
+using System.Net.Http.Json;
 
 namespace tagless_receiver.Services;
 
@@ -7,7 +8,19 @@ public sealed class BleScanService
 {
     private BluetoothLEAdvertisementWatcher? watcher;
 
-    private readonly HashSet<int> detectedSenderIds = new();
+    private static readonly HttpClient httpClient = new();
+
+    private const string BleLinkApiUrl =
+        "https://tagless-api-production.up.railway.app/receiver/ble-link";
+
+
+    // 같은 Sender를 BLE 광고마다 서버로 보내지 않기 위한 제한
+    private readonly Dictionary<int, DateTime> lastBleLinkReport = new();
+
+    private readonly object reportLock = new();
+
+    private static readonly TimeSpan BleLinkReportInterval =
+        TimeSpan.FromSeconds(10);
 
     private long bleDebugCount = 0;
     private long taglessCount = 0;
@@ -45,7 +58,10 @@ public sealed class BleScanService
         watcher.Stopped -= OnWatcherStopped;
         watcher = null;
 
-        detectedSenderIds.Clear();
+        lock (reportLock)
+        {
+            lastBleLinkReport.Clear();
+        }
 
         Logger.Write("[BLE] Scan 중지");
     }
@@ -56,7 +72,7 @@ public sealed class BleScanService
     {
         bleDebugCount++;
 
-        if (bleDebugCount == 1 || bleDebugCount % 500 == 0)
+        if (bleDebugCount == 1 || bleDebugCount % 5000 == 0)
         {
             Logger.Write(
                 $"[BLE-DEBUG] 일반 BLE 광고 수신 {bleDebugCount}회"
@@ -125,6 +141,14 @@ public sealed class BleScanService
                 );
             }
 
+            if (ShouldReportBleLink(senderDeviceId))
+            {
+                _ = ReportBleLinkAsync(
+                    senderDeviceId,
+                    rssi
+                );
+            }
+
             return;
         }
     }
@@ -137,4 +161,111 @@ public sealed class BleScanService
             $"[BLE] Watcher 중지 error={args.Error}"
         );
     }
+
+    private bool ShouldReportBleLink(
+        int senderDeviceId)
+    {
+        lock (reportLock)
+        {
+            DateTime now =
+                DateTime.UtcNow;
+
+            if (
+                lastBleLinkReport.TryGetValue(
+                    senderDeviceId,
+                    out DateTime lastReport
+                )
+            )
+            {
+                if (
+                    now - lastReport
+                    < BleLinkReportInterval
+                )
+                {
+                    return false;
+                }
+            }
+
+            lastBleLinkReport[senderDeviceId] =
+                now;
+
+            return true;
+        }
+    }
+
+    private async Task ReportBleLinkAsync(
+        int senderDeviceId,
+        short rssi)
+    {
+        try
+        {
+            var config =
+                tagless_receiver.Program.Config;
+
+            if (
+                config == null ||
+                string.IsNullOrWhiteSpace(
+                    config.receiver_device_id
+                )
+            )
+            {
+                Logger.Write(
+                    "[BLE-LINK] receiver_device_id 없음"
+                );
+
+                return;
+            }
+
+
+            var payload = new
+            {
+                receiver_device_id =
+                    config.receiver_device_id,
+
+                sender_device_id =
+                    senderDeviceId,
+
+                rssi =
+                    (int)rssi
+            };
+
+
+            using HttpResponseMessage response =
+                await httpClient.PostAsJsonAsync(
+                    BleLinkApiUrl,
+                    payload
+                );
+
+
+            string responseText =
+                await response.Content.ReadAsStringAsync();
+
+
+            if (!response.IsSuccessStatusCode)
+            {
+                Logger.Write(
+                    "[BLE-LINK] 서버 전송 실패: " +
+                    $"status={(int)response.StatusCode}, " +
+                    $"body={responseText}"
+                );
+
+                return;
+            }
+
+
+            Logger.Write(
+                "[BLE-LINK] 수신 확인 서버 전송: " +
+                $"sender_device_id={senderDeviceId}, " +
+                $"RSSI={rssi}"
+            );
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(
+                "[BLE-LINK] ReportBleLinkAsync 실패",
+                ex
+            );
+        }
+    }
+
 }
