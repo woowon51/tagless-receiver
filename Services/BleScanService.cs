@@ -30,6 +30,8 @@ public sealed class BleScanService
             "e747f937-5029-55a4-90ed-370194b05a34"
         );
 
+    private readonly AttendanceChecker attendanceChecker = new();
+
     public void Start()
     {
         if (watcher != null)
@@ -141,6 +143,10 @@ public sealed class BleScanService
                 );
             }
 
+            // 출석 START / END 판정용
+            attendanceChecker.Seen(senderDeviceId);
+
+            // 기존 ble_link 서버 보고
             if (ShouldReportBleLink(senderDeviceId))
             {
                 _ = ReportBleLinkAsync(
@@ -252,12 +258,13 @@ public sealed class BleScanService
                 return;
             }
 
-
+            /*
             Logger.Write(
                 "[BLE-LINK] 수신 확인 서버 전송: " +
                 $"sender_device_id={senderDeviceId}, " +
                 $"RSSI={rssi}"
             );
+            */
         }
         catch (Exception ex)
         {
