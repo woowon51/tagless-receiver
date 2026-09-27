@@ -10,6 +10,7 @@ public partial class ReceiverTray : Form
     private ReceiverConfig config;
 
     private readonly BleScanService bleScanService = new();
+    private readonly BleAdvertiseService bleAdvertiseService = new();
 
     public ReceiverTray()
     {
@@ -44,7 +45,8 @@ public partial class ReceiverTray : Form
                 "[Receiver] 이미 등록 완료"
             );
 
-            bleScanService.Start();
+            bleScanService.Start();       // 안드로이드용
+            bleAdvertiseService.Start();  // 아이폰 ios 용
             return;
         }
 
@@ -133,6 +135,7 @@ public partial class ReceiverTray : Form
             MessageBoxIcon.Information
         );
 
-        bleScanService.Start();
+        bleScanService.Start();        // 안드로이드용
+        bleAdvertiseService.Start();   // 아이폰 ios 용
     }
 }

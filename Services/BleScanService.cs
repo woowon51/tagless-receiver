@@ -74,6 +74,19 @@ public sealed class BleScanService
     {
         bleDebugCount++;
 
+        foreach (var uuid in args.Advertisement.ServiceUuids)
+        {
+            if (!uuid.ToString().StartsWith(
+                "00000036",
+                StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            Logger.Write(
+                $"[BLE-IOS-TEST] UUID={uuid}, " +
+                $"RSSI={args.RawSignalStrengthInDBm}"
+            );
+        }
+
         if (bleDebugCount == 1 || bleDebugCount % 5000 == 0)
         {
             Logger.Write(
