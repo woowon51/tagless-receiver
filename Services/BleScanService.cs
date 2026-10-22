@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using Windows.Devices.Bluetooth.Advertisement;
 using System.Net.Http.Json;
 
@@ -20,7 +20,7 @@ public sealed class BleScanService
     private readonly object reportLock = new();
 
     private static readonly TimeSpan BleLinkReportInterval =
-        TimeSpan.FromSeconds(10);
+        TimeSpan.FromSeconds(2);
 
     private long bleDebugCount = 0;
     private long taglessCount = 0;
@@ -164,7 +164,8 @@ public sealed class BleScanService
             {
                 _ = ReportBleLinkAsync(
                     senderDeviceId,
-                    rssi
+                    rssi,
+                    args.Timestamp.UtcDateTime
                 );
             }
 
@@ -214,7 +215,8 @@ public sealed class BleScanService
 
     private async Task ReportBleLinkAsync(
         int senderDeviceId,
-        short rssi)
+        short rssi,
+        DateTime observedAt)
     {
         try
         {
@@ -245,7 +247,8 @@ public sealed class BleScanService
                     senderDeviceId,
 
                 rssi =
-                    (int)rssi
+                    (int)rssi,
+                observed_at = observedAt
             };
 
 
