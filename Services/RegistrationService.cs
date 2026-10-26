@@ -1,148 +1,20 @@
-﻿using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using tagless_receiver.Models;
-
 namespace tagless_receiver.Services;
-
 public static class RegistrationService
 {
-    private static readonly HttpClient httpClient = new();
-
-    private const string ApiBaseUrl =
-        "https://tagless-api-production.up.railway.app/receiver";
-
-    private const string RegistrationApiUrl =
-        ApiBaseUrl + "/config";
-
-    private const string RegisterCheckApiUrl =
-        ApiBaseUrl + "/register-check";
-
-    private const string CleanupApiUrl =
-        ApiBaseUrl + "/cleanup";
-
-    private static readonly JsonSerializerOptions jsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true
-    };
-
-    public static async Task<ReceiverConfig?> RegisterCheckAsync(
-        string receiverDeviceId,
-        string hardwareFingerprint)
+    private static readonly HttpClient Http=new(){Timeout=TimeSpan.FromSeconds(10)};
+    private const string Url="https://taglesscheck.com/receiver/register-check";
+    public static async Task<ReceiverConfig?> RegisterCheckAsync(string receiverDeviceId,string hardwareFingerprint)
     {
         try
         {
-            var payload = new
-            {
-                receiver_device_id = receiverDeviceId,
-                hardware_fingerprint = hardwareFingerprint
-            };
-
-            using HttpResponseMessage response =
-                await httpClient.PostAsJsonAsync(
-                    RegisterCheckApiUrl,
-                    payload
-                );
-
-            string json =
-                await response.Content.ReadAsStringAsync();
-
+            using var response=await Http.PostAsJsonAsync(Url,new {
+                receiver_device_id=receiverDeviceId,hardware_fingerprint=hardwareFingerprint,install_key=InstallIdentity.Key()});
             response.EnsureSuccessStatusCode();
-
-            return JsonSerializer.Deserialize<ReceiverConfig>(
-                json,
-                jsonOptions
-            );
+            return await response.Content.ReadFromJsonAsync<ReceiverConfig>(new JsonSerializerOptions{PropertyNameCaseInsensitive=true});
         }
-        catch (Exception ex)
-        {
-            Logger.Error(
-                "[RegistrationService] RegisterCheckAsync 실패",
-                ex
-            );
-
-            return null;
-        }
-    }
-
-    public static async Task<int?> CleanupPendingAsync()
-    {
-        try
-        {
-            using HttpResponseMessage response =
-                await httpClient.PostAsync(
-                    CleanupApiUrl,
-                    content: null
-                );
-
-            string json =
-                await response.Content.ReadAsStringAsync();
-
-            response.EnsureSuccessStatusCode();
-
-            CleanupResponse? result =
-                JsonSerializer.Deserialize<CleanupResponse>(
-                    json,
-                    jsonOptions
-                );
-
-            return result?.deleted_count;
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(
-                "[RegistrationService] CleanupPendingAsync 실패",
-                ex
-            );
-
-            return null;
-        }
-    }
-
-    public static async Task<ReceiverConfig?> GetRegistrationAsync(
-        string receiverDeviceId)
-    {
-        try
-        {
-            string url =
-                $"{RegistrationApiUrl}" +
-                $"?receiver_device_id=" +
-                $"{Uri.EscapeDataString(receiverDeviceId)}";
-
-            Logger.Write($"GET {url}");
-
-            using HttpResponseMessage response =
-                await httpClient.GetAsync(url);
-
-            if (response.StatusCode == HttpStatusCode.NotFound)
-            {
-                return null;
-            }
-
-            string json =
-                await response.Content.ReadAsStringAsync();
-
-            response.EnsureSuccessStatusCode();
-
-            return JsonSerializer.Deserialize<ReceiverConfig>(
-                json,
-                jsonOptions
-            );
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(
-                "[RegistrationService] GetRegistrationAsync 실패",
-                ex
-            );
-
-            return null;
-        }
-    }
-
-    private sealed class CleanupResponse
-    {
-        public string? status { get; set; }
-        public int deleted_count { get; set; }
+        catch(Exception) {Logger.Write("[RegistrationService] 등록 확인 실패: 운영을 보류하고 재시도합니다.");return null;}
     }
 }

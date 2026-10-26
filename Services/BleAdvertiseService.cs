@@ -1,4 +1,4 @@
-﻿// ============================================================================
+// ============================================================================
 // BleAdvertiseService.cs = TRE_BB  쏘는 놈. TRE 는 받는 놈. 
 //
 // 목적:
@@ -83,19 +83,10 @@ namespace tagless_receiver.Services
                 return;
             }
 
-            string treConfig =
-                $"{{\"receiver_device_id\":\"{config.receiver_device_id}\"," +
-                $"\"business_id\":{config.business_id}," +
-                $"\"class_id\":{config.class_id}}}";
-
-            var writer = new DataWriter();
-            writer.WriteBytes(Encoding.UTF8.GetBytes(treConfig));
-
             var parameters = new GattLocalCharacteristicParameters
             {
                 CharacteristicProperties = GattCharacteristicProperties.Read,
-                ReadProtectionLevel = GattProtectionLevel.Plain,
-                StaticValue = writer.DetachBuffer()
+                ReadProtectionLevel = GattProtectionLevel.Plain
             };
 
             var characteristicResult =
@@ -112,17 +103,61 @@ namespace tagless_receiver.Services
                 return;
             }
 
-            Logger.Write($"[BLE-GATT] TRE_CONFIG 생성: {treConfig}");
-
-            provider.StartAdvertising(
-                new GattServiceProviderAdvertisingParameters
+            characteristicResult.Characteristic.ReadRequested += async (sender, args) =>
+            {
+                var deferral = args.GetDeferral();
+                try
                 {
-                    IsDiscoverable = true,
-                    IsConnectable = true
+                    var request = await args.GetRequestAsync();
+                    if (request is null) return;
+                    var current = tagless_receiver.Program.Config;
+                    string treConfig = System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        current.receiver_device_id,
+                        current.business_id,
+                        current.class_id
+                    });
+                    byte[] bytes = Encoding.UTF8.GetBytes(treConfig);
+                    if (request.Offset > bytes.Length)
+                    {
+                        request.RespondWithProtocolError(0x07);
+                        return;
+                    }
+                    // 긴 GATT 값을 읽는 클라이언트의 offset도 처리한다.
+                    using var writer = new DataWriter();
+                    writer.WriteBytes(bytes.Skip((int)request.Offset).ToArray());
+                    request.RespondWithValue(writer.DetachBuffer());
                 }
-            );
+                catch (Exception ex) { Logger.Error("[BLE-GATT] 설정 읽기 실패", ex); }
+                finally { deferral.Complete(); }
+            };
+            Logger.Write("[BLE-GATT] TRE_CONFIG 동적 읽기 준비 완료");
 
-            Logger.Write($"[BLE-GATT] 광고 시작 UUID={TaglessUuid}");
+
+            try
+            {
+                provider.StartAdvertising(
+                    new GattServiceProviderAdvertisingParameters
+                    {
+                        IsDiscoverable = true,
+                        IsConnectable = true
+                    }
+                );
+
+                Logger.Write($"[BLE-GATT] 광고 시작 요청 UUID={TaglessUuid}");
+            }
+            catch (System.Runtime.InteropServices.COMException ex)
+            {
+                Logger.Error(
+                    $"[BLE-GATT] 광고 시작 실패 HRESULT=0x{ex.HResult:X8}",
+                    ex
+                );
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("[BLE-GATT] 광고 시작 예외", ex);
+            }
+
         }
 
         public void Stop()

@@ -59,7 +59,17 @@ public static class ConfigService
                 WriteIndented = true
             });
 
-        File.WriteAllText(configPath, json);
+        // 같은 폴더에서 교체해 저장 중 중단되어도 기존 파일을 보존한다.
+        string temporary = configPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            File.WriteAllText(temporary, json);
+            File.Move(temporary, configPath, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(temporary)) File.Delete(temporary);
+        }
 
     }
 }

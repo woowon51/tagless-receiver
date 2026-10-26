@@ -1,4 +1,4 @@
-﻿using Microsoft.Win32;
+using Microsoft.Win32;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -24,10 +24,10 @@ public static class HardwareFingerprintService
 
         if (string.IsNullOrWhiteSpace(machineGuid))
         {
-            Logger.Write("[HardwareFingerprint] MachineGuid 읽기 실패");
+            throw new InvalidOperationException("Windows PC 식별정보를 읽을 수 없습니다.");
         }
 
-        Logger.Write($"[HardwareFingerprint] MachineGuid = {machineGuid}");
+
 
         using SHA256 sha = SHA256.Create();
 
@@ -36,7 +36,7 @@ public static class HardwareFingerprintService
                 Encoding.UTF8.GetBytes(machineGuid)
             );
         string fingerprint = Convert.ToHexString(hash);
-        Logger.Write($"[HardwareFingerprint] Fingerprint = {fingerprint}");
+
 
         Logger.Write("[HardwareFingerprint] 생성 완료");
 
