@@ -53,24 +53,53 @@ namespace tagless_receiver.Services
         private static readonly Guid TreConfigUuid = 
             Guid.Parse("e747f937-5029-55a4-90ed-370194b05a35"); 
 
+        // Log-only deterministic abbreviation; never returns the receiver ID itself.
+        private static string? GetReceiverLogId()
+        {
+            try
+            {
+                string? receiverId = Program.Config?.receiver_device_id;
+                if (string.IsNullOrWhiteSpace(receiverId))
+                    return null;
+
+                byte[] digest = System.Security.Cryptography.SHA256.HashData(
+                    System.Text.Encoding.UTF8.GetBytes(receiverId));
+                return "h" + Convert.ToHexString(digest.AsSpan(0, 8));
+            }
+            catch
+            {
+                // Identifier formatting must not affect BLE processing.
+                return null;
+            }
+        }
+
         public async void Start()
         {
+            Logger.Trace("cs_ble_advertise", "BleAdvertiseService", "Start", "IN", "", businessId: Program.Config?.business_id, classId: Program.Config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: GetReceiverLogId());
             if (provider != null)
+            {
+                Logger.Trace("cs_ble_advertise", "BleAdvertiseService", "Start", "SKIP ALREADY STARTED", "", businessId: Program.Config?.business_id, classId: Program.Config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: GetReceiverLogId());
                 return;
+            }
 
             var result = await GattServiceProvider.CreateAsync(TaglessUuid);
 
             if (result.Error != BluetoothError.Success)
             {
-                Logger.Write($"[BLE-GATT] Service 생성 실패: {result.Error}");
+                Logger.Trace("cs_ble_advertise", "BleAdvertiseService", "Start", "ERROR SERVICE CREATE", $"error={result.Error}", businessId: Program.Config?.business_id, classId: Program.Config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: GetReceiverLogId());
                 return;
             }
 
+            Logger.Trace("cs_ble_advertise", "BleAdvertiseService", "Start", "SERVICE CREATED", "", businessId: Program.Config?.business_id, classId: Program.Config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: GetReceiverLogId());
             provider = result.ServiceProvider;
+            int lastLoggedAdvertisementStatus = -1;
 
             provider.AdvertisementStatusChanged += (sender, args) =>
             {
-                Logger.Write($"[BLE-GATT] status={args.Status}, UUID={TaglessUuid}");
+                if (System.Threading.Interlocked.Exchange(ref lastLoggedAdvertisementStatus, (int)args.Status) != (int)args.Status)
+                {
+                    Logger.Trace("cs_ble_advertise", "BleAdvertiseService", "AdvertisementStatusChanged", "STATUS", $"status={args.Status}, error={args.Error}", businessId: Program.Config?.business_id, classId: Program.Config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: GetReceiverLogId());
+                }
             };
 
             // TRE config.json의 핵심 정보를 TSI가 읽을 수 있도록
@@ -79,7 +108,7 @@ namespace tagless_receiver.Services
 
             if (config == null)
             {
-                Logger.Write("[BLE-GATT] config 없음");
+                Logger.Trace("cs_ble_advertise", "BleAdvertiseService", "Start", "CONFIG MISSING", "", businessId: Program.Config?.business_id, classId: Program.Config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: GetReceiverLogId());
                 return;
             }
 
@@ -97,19 +126,23 @@ namespace tagless_receiver.Services
 
             if (characteristicResult.Error != BluetoothError.Success)
             {
-                Logger.Write(
-                    $"[BLE-GATT] TRE_CONFIG 생성 실패: {characteristicResult.Error}"
-                );
+                Logger.Trace("cs_ble_advertise", "BleAdvertiseService", "Start", "ERROR CHARACTERISTIC CREATE", $"error={characteristicResult.Error}", businessId: Program.Config?.business_id, classId: Program.Config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: GetReceiverLogId());
                 return;
             }
 
+            Logger.Trace("cs_ble_advertise", "BleAdvertiseService", "Start", "CHARACTERISTIC CREATED", "", businessId: Program.Config?.business_id, classId: Program.Config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: GetReceiverLogId());
             characteristicResult.Characteristic.ReadRequested += async (sender, args) =>
             {
+                Logger.Trace("cs_ble_advertise", "BleAdvertiseService", "ReadRequested", "READ REQUEST", "", businessId: Program.Config?.business_id, classId: Program.Config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: GetReceiverLogId());
                 var deferral = args.GetDeferral();
                 try
                 {
                     var request = await args.GetRequestAsync();
-                    if (request is null) return;
+                    if (request is null)
+                    {
+                        Logger.Trace("cs_ble_advertise", "BleAdvertiseService", "ReadRequested", "READ REQUEST NULL", "", businessId: Program.Config?.business_id, classId: Program.Config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: GetReceiverLogId());
+                        return;
+                    }
                     var current = tagless_receiver.Program.Config;
                     string treConfig = System.Text.Json.JsonSerializer.Serialize(new
                     {
@@ -121,17 +154,19 @@ namespace tagless_receiver.Services
                     if (request.Offset > bytes.Length)
                     {
                         request.RespondWithProtocolError(0x07);
+                        Logger.Trace("cs_ble_advertise", "BleAdvertiseService", "ReadRequested", "READ OFFSET ERROR", "protocol_error=0x07", businessId: Program.Config?.business_id, classId: Program.Config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: GetReceiverLogId());
                         return;
                     }
                     // 긴 GATT 값을 읽는 클라이언트의 offset도 처리한다.
                     using var writer = new DataWriter();
                     writer.WriteBytes(bytes.Skip((int)request.Offset).ToArray());
                     request.RespondWithValue(writer.DetachBuffer());
+                    Logger.Trace("cs_ble_advertise", "BleAdvertiseService", "ReadRequested", "READ RESPONDED", "", businessId: Program.Config?.business_id, classId: Program.Config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: GetReceiverLogId());
                 }
-                catch (Exception ex) { Logger.Error("[BLE-GATT] 설정 읽기 실패", ex); }
+                catch (Exception ex) { Logger.Trace("cs_ble_advertise", "BleAdvertiseService", "ReadRequested", "ERROR READ", $"type={ex.GetType().Name}", businessId: Program.Config?.business_id, classId: Program.Config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: GetReceiverLogId()); }
                 finally { deferral.Complete(); }
             };
-            Logger.Write("[BLE-GATT] TRE_CONFIG 동적 읽기 준비 완료");
+            Logger.Trace("cs_ble_advertise", "BleAdvertiseService", "Start", "CONFIG READ READY", "", businessId: Program.Config?.business_id, classId: Program.Config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: GetReceiverLogId());
 
 
             try
@@ -144,31 +179,33 @@ namespace tagless_receiver.Services
                     }
                 );
 
-                Logger.Write($"[BLE-GATT] 광고 시작 요청 UUID={TaglessUuid}");
+                Logger.Trace("cs_ble_advertise", "BleAdvertiseService", "Start", "ADVERTISE REQUESTED", "", businessId: Program.Config?.business_id, classId: Program.Config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: GetReceiverLogId());
             }
             catch (System.Runtime.InteropServices.COMException ex)
             {
-                Logger.Error(
-                    $"[BLE-GATT] 광고 시작 실패 HRESULT=0x{ex.HResult:X8}",
-                    ex
-                );
+                Logger.Trace("cs_ble_advertise", "BleAdvertiseService", "Start", "ERROR", $"type={ex.GetType().Name}, HRESULT=0x{ex.HResult:X8}", businessId: Program.Config?.business_id, classId: Program.Config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: GetReceiverLogId());
             }
             catch (Exception ex)
             {
-                Logger.Error("[BLE-GATT] 광고 시작 예외", ex);
+                Logger.Trace("cs_ble_advertise", "BleAdvertiseService", "Start", "ERROR", $"type={ex.GetType().Name}", businessId: Program.Config?.business_id, classId: Program.Config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: GetReceiverLogId());
             }
 
         }
 
         public void Stop()
         {
+            Logger.Trace("cs_ble_advertise", "BleAdvertiseService", "Stop", "IN", "", businessId: Program.Config?.business_id, classId: Program.Config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: GetReceiverLogId());
             if (provider == null)
+            {
+                Logger.Trace("cs_ble_advertise", "BleAdvertiseService", "Stop", "SKIP NOT STARTED", "", businessId: Program.Config?.business_id, classId: Program.Config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: GetReceiverLogId());
                 return;
+            }
 
             provider.StopAdvertising();
+            Logger.Trace("cs_ble_advertise", "BleAdvertiseService", "Stop", "ADVERTISE STOPPED", "", businessId: Program.Config?.business_id, classId: Program.Config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: GetReceiverLogId());
             provider = null;
 
-            Logger.Write("[BLE-GATT] 광고 중지");
+            Logger.Trace("cs_ble_advertise", "BleAdvertiseService", "Stop", "OUT", "", businessId: Program.Config?.business_id, classId: Program.Config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: GetReceiverLogId());
         }
     }
 }

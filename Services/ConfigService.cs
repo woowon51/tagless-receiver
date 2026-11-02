@@ -17,16 +17,23 @@ public static class ConfigService
 
     public static ReceiverConfig LoadOrCreate()
     {
+        Logger.Trace("cs_config", "ConfigService", "LoadOrCreate", "IN", "", businessId: null, classId: null, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: null);
         // config.json 이 있으면 읽기
         if (File.Exists(configPath))
         {
+            Logger.Trace("cs_config", "ConfigService", "LoadOrCreate", "FILE EXISTS", "", businessId: null, classId: null, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: null);
             string json = File.ReadAllText(configPath);
 
             ReceiverConfig? config =
                 JsonSerializer.Deserialize<ReceiverConfig>(json);
 
             if (config != null)
+            {
+                Logger.Trace("cs_config", "ConfigService", "LoadOrCreate", "CONFIG LOADED", "", businessId: config.business_id, classId: config.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: null);
+                Logger.Trace("cs_config", "ConfigService", "LoadOrCreate", "OUT", "", businessId: config.business_id, classId: config.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: null);
                 return config;
+            }
+            Logger.Trace("cs_config", "ConfigService", "LoadOrCreate", "CONFIG INVALID", "", businessId: null, classId: null, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: null);
         }
 
         // config.json 이 없으면 새로 생성
@@ -40,17 +47,22 @@ public static class ConfigService
             config_version = 1
         };
 
+        Logger.Trace("cs_config", "ConfigService", "LoadOrCreate", "CONFIG NEW", "", businessId: newConfig.business_id, classId: newConfig.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: null);
         // config.json 저장
         Save(newConfig);
+        Logger.Trace("cs_config", "ConfigService", "LoadOrCreate", "CONFIG SAVED", "", businessId: newConfig.business_id, classId: newConfig.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: null);
 
         // 새로 생성한 config.json 반환
+        Logger.Trace("cs_config", "ConfigService", "LoadOrCreate", "OUT", "", businessId: newConfig.business_id, classId: newConfig.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: null);
         return newConfig;
     }
 
     public static void Save(ReceiverConfig config)
     {
+        Logger.Trace("cs_config", "ConfigService", "Save", "IN", "", businessId: config?.business_id, classId: config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: null);
         // C:\TaglessReceiver  폴더가 없으면 생성
         Directory.CreateDirectory(configFolder);
+        Logger.Trace("cs_config", "ConfigService", "Save", "DIRECTORY READY", "", businessId: config?.business_id, classId: config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: null);
 
         string json = JsonSerializer.Serialize(
             config,
@@ -64,12 +76,15 @@ public static class ConfigService
         try
         {
             File.WriteAllText(temporary, json);
+            Logger.Trace("cs_config", "ConfigService", "Save", "TEMP WRITE", "", businessId: config?.business_id, classId: config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: null);
             File.Move(temporary, configPath, overwrite: true);
+            Logger.Trace("cs_config", "ConfigService", "Save", "FILE REPLACED", "", businessId: config?.business_id, classId: config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: null);
         }
         finally
         {
             if (File.Exists(temporary)) File.Delete(temporary);
         }
+        Logger.Trace("cs_config", "ConfigService", "Save", "OUT", "", businessId: config?.business_id, classId: config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: null);
 
     }
 }

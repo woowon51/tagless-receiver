@@ -32,10 +32,34 @@ public sealed class BleScanService
 
     private readonly AttendanceChecker attendanceChecker = new();
 
+    // Log-only deterministic abbreviation; never returns the receiver ID itself.
+    private static string? GetReceiverLogId()
+    {
+        try
+        {
+            string? receiverId = Program.Config?.receiver_device_id;
+            if (string.IsNullOrWhiteSpace(receiverId))
+                return null;
+
+            byte[] digest = System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(receiverId));
+            return "h" + Convert.ToHexString(digest.AsSpan(0, 8));
+        }
+        catch
+        {
+            // Identifier formatting must not affect BLE processing.
+            return null;
+        }
+    }
+
     public void Start()
     {
+        Logger.Trace("cs_ble_scan", "BleScanService", "Start", "IN", "", businessId: Program.Config?.business_id, classId: Program.Config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: GetReceiverLogId());
         if (watcher != null)
+        {
+            Logger.Trace("cs_ble_scan", "BleScanService", "Start", "SKIP ALREADY STARTED", "", businessId: Program.Config?.business_id, classId: Program.Config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: GetReceiverLogId());
             return;
+        }
 
         watcher = new BluetoothLEAdvertisementWatcher
         {
@@ -47,15 +71,20 @@ public sealed class BleScanService
 
         watcher.Start();
 
-        Logger.Write("[BLE] Scan 시작");
+        Logger.Trace("cs_ble_scan", "BleScanService", "Start", "OUT SCAN STARTED", "", businessId: Program.Config?.business_id, classId: Program.Config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: GetReceiverLogId());
     }
 
     public void Stop()
     {
+        Logger.Trace("cs_ble_scan", "BleScanService", "Stop", "IN", "", businessId: Program.Config?.business_id, classId: Program.Config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: GetReceiverLogId());
         if (watcher == null)
+        {
+            Logger.Trace("cs_ble_scan", "BleScanService", "Stop", "SKIP NOT STARTED", "", businessId: Program.Config?.business_id, classId: Program.Config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: GetReceiverLogId());
             return;
+        }
 
         watcher.Stop();
+        Logger.Trace("cs_ble_scan", "BleScanService", "Stop", "SCAN STOPPED", "", businessId: Program.Config?.business_id, classId: Program.Config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: GetReceiverLogId());
         watcher.Received -= OnAdvertisementReceived;
         watcher.Stopped -= OnWatcherStopped;
         watcher = null;
@@ -65,7 +94,7 @@ public sealed class BleScanService
             lastBleLinkReport.Clear();
         }
 
-        Logger.Write("[BLE] Scan 중지");
+        Logger.Trace("cs_ble_scan", "BleScanService", "Stop", "OUT", "", businessId: Program.Config?.business_id, classId: Program.Config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: GetReceiverLogId());
     }
 
     private void OnAdvertisementReceived(
@@ -81,17 +110,12 @@ public sealed class BleScanService
                 StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            Logger.Write(
-                $"[BLE-IOS-TEST] UUID={uuid}, " +
-                $"RSSI={args.RawSignalStrengthInDBm}"
-            );
+            Logger.Trace("cs_ble_scan", "BleScanService", "OnAdvertisementReceived", "BLE-IOS-TEST", $"UUID={uuid}, RSSI={args.RawSignalStrengthInDBm}", businessId: Program.Config?.business_id, classId: Program.Config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: GetReceiverLogId());
         }
 
         if (bleDebugCount == 1 || bleDebugCount % 5000 == 0)
         {
-            Logger.Write(
-                $"[BLE-DEBUG] 일반 BLE 광고 수신 {bleDebugCount}회"
-            );
+            Logger.Trace("cs_ble_scan", "BleScanService", "OnAdvertisementReceived", "IN", $"BLE-DEBUG 일반 BLE 광고 수신 {bleDebugCount}회", businessId: Program.Config?.business_id, classId: Program.Config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: GetReceiverLogId());
         }
 
         foreach (var section in args.Advertisement.DataSections)
@@ -148,12 +172,7 @@ public sealed class BleScanService
 
             if (taglessCount == 1 || taglessCount % 500 == 0)
             {
-                Logger.Write(
-                    $"[BLE] Tagless Sender 확인 {taglessCount}회: " +
-                    $"sender_device_id={senderDeviceId}, " +
-                    $"address={bluetoothAddress}, " +
-                    $"RSSI={rssi}"
-                );
+                Logger.Trace("cs_ble_scan", "BleScanService", "OnAdvertisementReceived", "IN", $"MHSender 확인 {taglessCount}회: addr={bluetoothAddress}, RSSI={rssi}", businessId: Program.Config?.business_id, classId: Program.Config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: senderDeviceId, receiverDeviceId: GetReceiverLogId());
             }
 
             // 출석 START / END 판정용
@@ -177,9 +196,7 @@ public sealed class BleScanService
         BluetoothLEAdvertisementWatcher sender,
         BluetoothLEAdvertisementWatcherStoppedEventArgs args)
     {
-        Logger.Write(
-            $"[BLE] Watcher 중지 error={args.Error}"
-        );
+        Logger.Trace("cs_ble_scan", "BleScanService", "OnWatcherStopped", args.Error == Windows.Devices.Bluetooth.BluetoothError.Success ? "STOPPED" : "ERROR WATCHER STOPPED", $"error={args.Error}", businessId: Program.Config?.business_id, classId: Program.Config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: GetReceiverLogId());
     }
 
     private bool ShouldReportBleLink(
@@ -209,6 +226,7 @@ public sealed class BleScanService
             lastBleLinkReport[senderDeviceId] =
                 now;
 
+            Logger.Trace("cs_ble_scan", "BleScanService", "ShouldReportBleLink", "REPORT", "", businessId: Program.Config?.business_id, classId: Program.Config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: senderDeviceId, receiverDeviceId: GetReceiverLogId());
             return true;
         }
     }
@@ -218,6 +236,7 @@ public sealed class BleScanService
         short rssi,
         DateTime observedAt)
     {
+        Logger.Trace("cs_ble_scan", "BleScanService", "ReportBleLinkAsync", "IN", "", businessId: Program.Config?.business_id, classId: Program.Config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: senderDeviceId, receiverDeviceId: GetReceiverLogId());
         try
         {
             var config =
@@ -230,9 +249,7 @@ public sealed class BleScanService
                 )
             )
             {
-                Logger.Write(
-                    "[BLE-LINK] receiver_device_id 없음"
-                );
+                Logger.Trace("cs_ble_scan", "BleScanService", "ReportBleLinkAsync", "CONFIG MISSING", "", businessId: Program.Config?.business_id, classId: Program.Config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: senderDeviceId, receiverDeviceId: GetReceiverLogId());
 
                 return;
             }
@@ -259,17 +276,15 @@ public sealed class BleScanService
                 );
 
 
+            Logger.Trace("cs_ble_scan", "BleScanService", "ReportBleLinkAsync", $"HTTP({(int)response.StatusCode})", response.IsSuccessStatusCode ? "서버 응답 수신" : "서버가 BLE 링크 보고를 거부하거나 처리하지 못함", businessId: Program.Config?.business_id, classId: Program.Config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: senderDeviceId, receiverDeviceId: GetReceiverLogId());
+
             string responseText =
                 await response.Content.ReadAsStringAsync();
 
 
             if (!response.IsSuccessStatusCode)
             {
-                Logger.Write(
-                    "[BLE-LINK] 서버 전송 실패: " +
-                    $"status={(int)response.StatusCode}, " +
-                    $"body={responseText}"
-                );
+                // The status was logged on receipt; never log the response body.
 
                 return;
             }
@@ -284,10 +299,7 @@ public sealed class BleScanService
         }
         catch (Exception ex)
         {
-            Logger.Error(
-                "[BLE-LINK] ReportBleLinkAsync 실패",
-                ex
-            );
+            Logger.Trace("cs_ble_scan", "BleScanService", "ReportBleLinkAsync", "ERROR", $"type={ex.GetType().Name}; BLE 링크 보고 처리 실패", businessId: Program.Config?.business_id, classId: Program.Config?.class_id, businessMemberId: null, staffId: null, senderDeviceId: senderDeviceId, receiverDeviceId: GetReceiverLogId());
         }
     }
 

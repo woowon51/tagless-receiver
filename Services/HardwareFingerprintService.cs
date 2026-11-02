@@ -8,7 +8,7 @@ public static class HardwareFingerprintService
 {
     public static string Create()
     {
-        Logger.Write("[HardwareFingerprint] 생성 시작");
+        Logger.Trace("cs_hardware_fingerprint", "HardwareFingerprintService", "Create", "IN", "", businessId: null, classId: null, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: null);
         string machineGuid = "";
 
         using RegistryKey? key =
@@ -24,6 +24,7 @@ public static class HardwareFingerprintService
 
         if (string.IsNullOrWhiteSpace(machineGuid))
         {
+            Logger.Trace("cs_hardware_fingerprint", "HardwareFingerprintService", "Create", "ERROR MACHINE GUID MISSING", "", businessId: null, classId: null, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: null);
             throw new InvalidOperationException("Windows PC 식별정보를 읽을 수 없습니다.");
         }
 
@@ -38,8 +39,9 @@ public static class HardwareFingerprintService
         string fingerprint = Convert.ToHexString(hash);
 
 
-        Logger.Write("[HardwareFingerprint] 생성 완료");
+        Logger.Trace("cs_hardware_fingerprint", "HardwareFingerprintService", "Create", "FINGERPRINT CREATED", "", businessId: null, classId: null, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: null);
 
+        Logger.Trace("cs_hardware_fingerprint", "HardwareFingerprintService", "Create", "OUT", "", businessId: null, classId: null, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: null);
         return Convert.ToHexString(hash);
     }
 }
