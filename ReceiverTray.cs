@@ -48,13 +48,16 @@ public partial class ReceiverTray : Form
             }}
             else
             {
-                int? previousBusinessId=config.business_id;
-                int? previousClassId=config.class_id;
+                bool configChanged =
+                    config.business_id != latest.business_id ||
+                    config.class_id != latest.class_id ||
+                    config.registered != latest.registered ||
+                    config.config_version != latest.config_version;
                 config.business_id=latest.business_id;config.class_id=latest.class_id;
                 config.registered=true;config.config_version=latest.config_version;
-                ConfigService.Save(config);
-                if(running && (previousBusinessId!=config.business_id || previousClassId!=config.class_id))
+                if(configChanged)
                 {
+                    ConfigService.Save(config);
                     Logger.Trace("cs_receiver_tray", "ReceiverTray", "MonitorAsync", "CONFIG CHANGED", "", businessId: config.business_id, classId: config.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: null);
                 }
                 if(!running){bleScanService.Start();bleAdvertiseService.Start();running=true;
