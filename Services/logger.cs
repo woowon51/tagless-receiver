@@ -44,6 +44,35 @@ namespace tagless_receiver
             Write(ex.ToString());
         }
 
+        internal static string ExceptionDetails(Exception exception, params string?[] secrets)
+        {
+            var details = new System.Collections.Generic.List<string>();
+            void Append(Exception current, string path)
+            {
+                string message = current.Message;
+                foreach (string? secret in secrets)
+                    if (!string.IsNullOrEmpty(secret))
+                        message = message.Replace(secret, "[REDACTED]", StringComparison.OrdinalIgnoreCase);
+                message = System.Text.RegularExpressions.Regex.Replace(message,
+                    @"(?i)(bearer\s+)[^\s,;]+", "$1[REDACTED]");
+                message = System.Text.RegularExpressions.Regex.Replace(message,
+                    @"(?i)((?:install_?key|access_?token|refresh_?token|authorization|hardware_?fingerprint)[""'\s]*[:=][""'\s]*)[^\s,;}""']+", "$1[REDACTED]");
+                message = System.Text.RegularExpressions.Regex.Replace(message,
+                    @"[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}", "[REDACTED]");
+                details.Add($"{path}={current.GetType().Name}: {message.Replace("\r", " ").Replace("\n", " ")}" +
+                    (current is System.Net.Sockets.SocketException socket ? $", SocketErrorCode={socket.SocketErrorCode}" : "") +
+                    (current is System.Net.Http.HttpRequestException http ? $", Network={http.HttpRequestError}, HTTP={((int?)http.StatusCode)?.ToString() ?? "NONE"}" : ""));
+                if (current is AggregateException aggregate)
+                {
+                    for (int i = 0; i < aggregate.InnerExceptions.Count; i++)
+                        Append(aggregate.InnerExceptions[i], $"{path}.inner[{i}]");
+                }
+                else if (current.InnerException is Exception inner)
+                    Append(inner, path + ".inner");
+            }
+            Append(exception, "exception");
+            return string.Join(" -> ", details);
+        }
         /// <summary>Writes a MeHere trace without changing legacy Write/Error formatting.</summary>
         public static void Trace(
             string fileAlias,
@@ -60,6 +89,11 @@ namespace tagless_receiver
         {
             try
             {
+                // Use only the configuration already held in memory.
+                var config = Program.Config;
+                businessId ??= config?.business_id;
+                classId ??= config?.class_id;
+                receiverDeviceId ??= config?.receiver_device_id;
                 var culture = System.Globalization.CultureInfo.InvariantCulture;
                 string timestamp = DateTimeOffset.UtcNow
                     .ToOffset(TimeSpan.FromHours(9))

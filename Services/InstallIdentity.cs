@@ -8,7 +8,6 @@ public static class InstallIdentity
     private static int pendingCleanupErrorLogged;
     public static string Key()
     {
-        Logger.Trace("cs_install_identity", "InstallIdentity", "Key", "IN", "", businessId: null, classId: null, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: null);
         using var r = Registry.CurrentUser.CreateSubKey(RegistryPath);
         try
         {
@@ -29,15 +28,20 @@ public static class InstallIdentity
         }
         if (r.GetValue("InstallKey") is byte[] data)
         {
-            string loadedKey = Encoding.UTF8.GetString(ProtectedData.Unprotect(data, null, DataProtectionScope.CurrentUser));
-            Logger.Trace("cs_install_identity", "InstallIdentity", "Key", "KEY LOADED", "", businessId: null, classId: null, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: null);
-            Logger.Trace("cs_install_identity", "InstallIdentity", "Key", "OUT", "", businessId: null, classId: null, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: null);
-            return loadedKey;
+            try
+            {
+                string loadedKey = Encoding.UTF8.GetString(ProtectedData.Unprotect(data, null, DataProtectionScope.CurrentUser));
+                return loadedKey;
+            }
+            catch (Exception ex)
+            {
+                Logger.Trace("cs_install_identity", "InstallIdentity", "Key", "ERROR KEY DECRYPT", $"type={ex.GetType().Name}; 설치 키 복호화 실패");
+                throw;
+            }
         }
         string key = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
         r.SetValue("InstallKey", ProtectedData.Protect(Encoding.UTF8.GetBytes(key), null, DataProtectionScope.CurrentUser), RegistryValueKind.Binary);
         Logger.Trace("cs_install_identity", "InstallIdentity", "Key", "KEY CREATED", "", businessId: null, classId: null, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: null);
-        Logger.Trace("cs_install_identity", "InstallIdentity", "Key", "OUT", "", businessId: null, classId: null, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: null);
         return key;
     }
 }

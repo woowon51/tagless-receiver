@@ -36,13 +36,19 @@ public partial class ReceiverTray : Form
                 Logger.Trace("cs_receiver_tray", "ReceiverTray", "MonitorAsync", "REGISTER CHECK START", "", businessId: config.business_id, classId: config.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: null);
                 firstRegisterCheck=false;
             }
-            var latest=await RegistrationService.RegisterCheckAsync(config.receiver_device_id,config.hardware_fingerprint);
+            var latest=await RegistrationService.RegisterCheckAsync(config.receiver_device_id,config.hardware_fingerprint,config.business_id,config.class_id);
             if(IsDisposed || Disposing)
             {
                 Logger.Trace("cs_receiver_tray", "ReceiverTray", "MonitorAsync", "OUT DISPOSED", "", businessId: config.business_id, classId: config.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: null);
                 return;
             }
-            if(latest is null || !latest.registered)
+            // A failed check preserves the current runtime state, initially stopped.
+            if(latest is null)
+            {
+                await Task.Delay(5000);
+                continue;
+            }
+            if(!latest.registered)
             {if(running) {bleScanService.Stop();bleAdvertiseService.Stop();running=false;
                 Logger.Trace("cs_receiver_tray", "ReceiverTray", "MonitorAsync", "REGISTERED → UNREGISTERED", "", businessId: config.business_id, classId: config.class_id, businessMemberId: null, staffId: null, senderDeviceId: null, receiverDeviceId: null);
             }}
